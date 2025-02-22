@@ -1,10 +1,12 @@
 export type RoomCreateDto = {
 	playerId: string;
+	playerName: string;
 	gridSize: string;
 };
 
 export type RoomJoinDto = {
 	playerId: string;
+	playerName: string;
 	roomId: string;
 };
 

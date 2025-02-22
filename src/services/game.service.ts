@@ -18,7 +18,7 @@ const getPlayer = async (gameState: GameState, playerId: string) => {
 	return player;
 };
 
-export const createRoom = async (playerId: string, gridSize: string) => {
+export const createRoom = async (playerId: string, playerName: string, gridSize: string) => {
 	let roomId: string;
 	do {
 		roomId = generateId();
@@ -32,6 +32,7 @@ export const createRoom = async (playerId: string, gridSize: string) => {
 		players: [
 			{
 				playerId,
+				playerName,
 				isConnected: true
 			}
 		]
@@ -41,13 +42,14 @@ export const createRoom = async (playerId: string, gridSize: string) => {
 	return { roomId, gameState };
 };
 
-export const joinRoom = async (playerId: string, roomId: string) => {
+export const joinRoom = async (playerId: string, playerName: string, roomId: string) => {
 	const gameState = await getGameState(roomId);
 	if (gameState.gameStarted) throw new GameError(gameErrorMessages.GAME_STARTED);
 	if (gameState.players.length === gameConfig.playerCount) throw new GameError(gameErrorMessages.ROOM_FULL);
 
 	gameState.players.push({
 		playerId,
+		playerName,
 		isConnected: true
 	});
 
@@ -136,13 +138,14 @@ export const resetRoom = async (roomId: string) => {
 	await redis.set(`room:${roomId}:gameState`, JSON.stringify(gameState));
 };
 
-export const rejoinRoom = async (playerId: string, roomId: string) => {
+export const rejoinRoom = async (playerId: string, playerName: string, roomId: string) => {
 	const gameState = await getGameState(roomId);
 	if (gameState.gameStarted) throw new GameError(gameErrorMessages.GAME_STARTED);
 	if (gameState.players.length === gameConfig.playerCount) throw new GameError(gameErrorMessages.ROOM_FULL);
 
 	gameState.players.push({
 		playerId,
+		playerName,
 		isConnected: true
 	});
 

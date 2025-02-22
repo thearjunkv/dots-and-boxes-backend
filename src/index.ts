@@ -40,10 +40,11 @@ io.on('connection', socket => {
 	socket.on(
 		'room:create',
 		safeSocketHandler(async (payload: RoomCreateDto) => {
-			const { playerId, gridSize } = payload;
-			const { roomId, gameState } = await createRoom(playerId, gridSize);
+			const { playerId, playerName, gridSize } = payload;
+			const { roomId, gameState } = await createRoom(playerId, playerName, gridSize);
 
 			socket.data.playerId = playerId;
+			socket.data.playerName = playerName;
 			socket.data.roomId = roomId;
 			socket.join(roomId);
 			socket.emit('room:create:ack', { gameState });
@@ -53,10 +54,11 @@ io.on('connection', socket => {
 	socket.on(
 		'room:join',
 		safeSocketHandler(async (payload: RoomJoinDto) => {
-			const { playerId, roomId } = payload;
-			const gameState = await joinRoom(playerId, roomId);
+			const { playerId, playerName, roomId } = payload;
+			const gameState = await joinRoom(playerId, playerName, roomId);
 
 			socket.data.playerId = playerId;
+			socket.data.playerName = playerName;
 			socket.data.roomId = roomId;
 			socket.join(roomId);
 			io.to(roomId).emit('room:refresh:preGame', { gameState });
@@ -130,8 +132,8 @@ io.on('connection', socket => {
 	socket.on(
 		'room:rejoin',
 		safeSocketHandler(async () => {
-			const { playerId, roomId } = socket.data;
-			const gameState = await rejoinRoom(playerId, roomId);
+			const { playerId, playerName, roomId } = socket.data;
+			const gameState = await rejoinRoom(playerId, playerName, roomId);
 
 			io.to(roomId).emit('room:refresh:preGame', { gameState });
 			socket.emit('room:rejoin:ack', { gameState });

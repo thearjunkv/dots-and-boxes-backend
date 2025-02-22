@@ -5,6 +5,7 @@ export type GameState = {
 	host: string;
 	players: {
 		playerId: string;
+		playerName: string;
 		isConnected: boolean;
 	}[];
 };
