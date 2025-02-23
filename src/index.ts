@@ -47,7 +47,7 @@ io.on('connection', socket => {
 			socket.data.playerName = playerName;
 			socket.data.roomId = roomId;
 			socket.join(roomId);
-			socket.emit('room:create:ack', { gameState });
+			socket.emit('room:create:ack', gameState);
 		}, socket)
 	);
 
@@ -61,8 +61,8 @@ io.on('connection', socket => {
 			socket.data.playerName = playerName;
 			socket.data.roomId = roomId;
 			socket.join(roomId);
-			io.to(roomId).emit('room:refresh:preGame', { gameState });
-			socket.emit('room:join:ack', { gameState });
+			io.to(roomId).emit('room:refresh:preGame', gameState);
+			socket.emit('room:join:ack', gameState);
 		}, socket)
 	);
 
@@ -75,7 +75,7 @@ io.on('connection', socket => {
 			socket.leave(roomId);
 			socket.emit('room:leave:ack');
 
-			if (gameState) io.to(roomId).emit('room:refresh:preGame', { gameState });
+			if (gameState) io.to(roomId).emit('room:refresh:preGame', gameState);
 		}, socket)
 	);
 
@@ -97,7 +97,7 @@ io.on('connection', socket => {
 
 			socket.emit('room:kick:ack');
 
-			if (gameState) io.to(roomId).emit('room:refresh:preGame', { gameState });
+			if (gameState) io.to(roomId).emit('room:refresh:preGame', gameState);
 		}, socket)
 	);
 
@@ -107,7 +107,7 @@ io.on('connection', socket => {
 			const { playerId, roomId } = socket.data;
 			const gameState = await startGame(playerId, roomId);
 
-			io.to(roomId).emit('game:started', { gameState });
+			io.to(roomId).emit('game:started', gameState);
 			socket.emit('game:start:ack');
 		}, socket)
 	);
@@ -135,8 +135,8 @@ io.on('connection', socket => {
 			const { playerId, playerName, roomId } = socket.data;
 			const gameState = await rejoinRoom(playerId, playerName, roomId);
 
-			io.to(roomId).emit('room:refresh:preGame', { gameState });
-			socket.emit('room:rejoin:ack', { gameState });
+			io.to(roomId).emit('room:refresh:preGame', gameState);
+			socket.emit('room:rejoin:ack', gameState);
 		}, socket)
 	);
 
@@ -145,7 +145,7 @@ io.on('connection', socket => {
 		safeSocketHandler(async () => {
 			const { playerId, roomId } = socket.data;
 			const data = await playerDisconnect(playerId, roomId);
-			if (data) io.to(data.roomId).emit('room:playerDisconnect', { gameState: data.gameState });
+			if (data) io.to(data.roomId).emit('room:playerDisconnect', data.gameState);
 		}, socket)
 	);
 });
