@@ -1,4 +1,5 @@
 export type GameState = {
+	roomId: string;
 	gameStarted: boolean;
 	currentMove: string;
 	gridSize: string;

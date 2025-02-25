@@ -10,6 +10,9 @@ export type RoomJoinDto = {
 	roomId: string;
 };
 
+export type RoomRejoinDto = RoomJoinDto;
+export type RoomReconnectDto = RoomJoinDto;
+
 export type RoomKickDto = { targetPlayerId: string };
 
 export type GameMoveDto = {

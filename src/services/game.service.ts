@@ -5,7 +5,7 @@ import redis from '../redis';
 import { GameState } from '../types';
 import { generateId } from '../utils';
 
-const getGameState = async (roomId: string) => {
+export const getGameState = async (roomId: string) => {
 	const gameStateJson = await redis.get(`room:${roomId}:gameState`);
 	if (!gameStateJson) throw new GameError(gameErrorMessages.ROOM_NOT_FOUND);
 
@@ -25,6 +25,7 @@ export const createRoom = async (playerId: string, playerName: string, gridSize:
 	} while (await redis.exists(`room:${roomId}:gameState`));
 
 	const gameState: GameState = {
+		roomId,
 		currentMove: '',
 		gameStarted: false,
 		gridSize,
@@ -43,7 +44,7 @@ export const createRoom = async (playerId: string, playerName: string, gridSize:
 };
 
 export const joinRoom = async (playerId: string, playerName: string, roomId: string) => {
-	const gameState = await getGameState(roomId);
+	const gameState = await getGameState(roomId.toUpperCase());
 	if (gameState.gameStarted) throw new GameError(gameErrorMessages.GAME_STARTED);
 	if (gameState.players.length === gameConfig.playerCount) throw new GameError(gameErrorMessages.ROOM_FULL);
 
@@ -66,7 +67,7 @@ export const leaveRoom = async (playerId: string, roomId: string) => {
 	const player = await getPlayer(gameState, playerId);
 
 	const remainingPlayers = gameState.players.filter(player => player.playerId !== playerId);
-	if (gameState.host === player.playerId) gameState.host === remainingPlayers[0].playerId;
+	if (gameState.host === player.playerId) gameState.host = remainingPlayers[0].playerId;
 
 	gameState.players = remainingPlayers;
 
@@ -142,7 +143,9 @@ export const rejoinRoom = async (playerId: string, playerName: string, roomId: s
 	const gameState = await getGameState(roomId);
 	if (gameState.gameStarted) throw new GameError(gameErrorMessages.GAME_STARTED);
 	if (gameState.players.length === gameConfig.playerCount) throw new GameError(gameErrorMessages.ROOM_FULL);
+	if (gameState.players.find(pl => pl.playerId === playerId)) return gameState;
 
+	if (gameState.host === '') gameState.host = playerId;
 	gameState.players.push({
 		playerId,
 		playerName,
@@ -153,18 +156,31 @@ export const rejoinRoom = async (playerId: string, playerName: string, roomId: s
 	return gameState;
 };
 
+export const reconnectRoom = async (playerId: string, playerName: string, roomId: string) => {
+	const gameState = await getGameState(roomId);
+	if (!gameState.gameStarted) throw new GameError(gameErrorMessages.DISCONNECTED);
+	const player = getPlayer(gameState, playerId);
+
+	gameState.players = gameState.players.map(pl => (pl.playerId === playerId ? { ...pl, isConnected: true } : pl));
+
+	await redis.set(`room:${roomId}:gameState`, JSON.stringify(gameState));
+	return gameState;
+};
+
 export const playerDisconnect = async (playerId: string, roomId: string) => {
 	const gameState = await getGameState(roomId);
 
 	if (!gameState.gameStarted) {
-		if (gameState.players.length <= 1) {
+		gameState.players = gameState.players.filter(player => player.playerId !== playerId);
+
+		if (gameState.players.length === 0) {
 			await redis.del(`room:${roomId}:gameState`);
 			return;
-		} else {
-			gameState.players = gameState.players.filter(player => player.playerId !== playerId);
-			await redis.set(`room:${roomId}:gameState`, JSON.stringify(gameState));
-			return { roomId, gameState };
 		}
+
+		if (gameState.host === playerId) gameState.host = gameState.players[0].playerId;
+		await redis.set(`room:${roomId}:gameState`, JSON.stringify(gameState));
+		return { roomId, gameState };
 	} else {
 		gameState.players = gameState.players.map(player => {
 			if (player.playerId === playerId) return { ...player, isConnected: false };
