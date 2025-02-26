@@ -65,7 +65,7 @@ io.on('connection', socket => {
 			socket.data.roomId = roomId;
 			socket.join(roomId);
 
-			io.to(roomId).emit('room:refresh', gameState);
+			io.to(roomId).emit('room:update:state', gameState);
 			socket.emit('room:join:ack', gameState);
 		}, socket)
 	);
@@ -79,7 +79,7 @@ io.on('connection', socket => {
 			socket.leave(roomId);
 			socket.data = null;
 
-			if (gameState) io.to(roomId).emit('room:refresh', gameState);
+			if (gameState) io.to(roomId).emit('room:update:state', gameState);
 		}, socket)
 	);
 
@@ -100,7 +100,7 @@ io.on('connection', socket => {
 				}
 			});
 
-			if (gameState) io.to(roomId).emit('room:refresh', gameState);
+			if (gameState) io.to(roomId).emit('room:update:state', gameState);
 		}, socket)
 	);
 
@@ -115,7 +115,7 @@ io.on('connection', socket => {
 			socket.data.playerId = playerId;
 			socket.data.playerName = playerName;
 			socket.data.roomId = roomId;
-			io.to(roomId).emit('room:refresh', gameState);
+			io.to(roomId).emit('room:update:state', gameState);
 			socket.emit('room:rejoin:ack', gameState);
 		}, socket)
 	);
@@ -160,7 +160,7 @@ io.on('connection', socket => {
 			socket.leave(roomId);
 			socket.data = null;
 
-			if (gameState) io.to(roomId).emit('room:game:refresh', gameState);
+			if (gameState) io.to(roomId).emit('room:update:state', gameState);
 		}, socket)
 	);
 
@@ -176,7 +176,7 @@ io.on('connection', socket => {
 			socket.data.playerName = playerName;
 			socket.data.roomId = roomId;
 
-			io.to(roomId).emit('room:game:refresh', gameState);
+			io.to(roomId).emit('room:update:state', gameState);
 			socket.emit('room:game:reconnect:ack', gameState);
 		}, socket)
 	);
@@ -186,7 +186,7 @@ io.on('connection', socket => {
 		safeSocketHandler(async () => {
 			const { playerId, roomId } = socket.data;
 			const data = await playerDisconnect(playerId, roomId);
-			if (data) io.to(data.roomId).emit('room:playerDisconnect', data.gameState);
+			if (data) io.to(data.roomId).emit('room:update:state', data.gameState);
 		}, socket)
 	);
 });
