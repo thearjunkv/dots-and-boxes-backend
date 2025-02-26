@@ -3,18 +3,19 @@ import { createServer } from 'http';
 import {
 	createRoom,
 	joinRoom,
-	kickPlayerFromRoom,
 	leaveRoom,
-	playerDisconnect,
-	reconnectRoom,
+	kickPlayerFromRoom,
 	rejoinRoom,
-	resetRoom,
 	startGame,
-	switchPlayer
+	switchPlayer,
+	resetRoom,
+	leaveGame,
+	reconnectGame,
+	playerDisconnect
 } from './services/game.service';
 import { gameErrorMessages } from './constants/game';
 import { GameError } from './errors/GameError';
-import { RoomCreateDto, RoomJoinDto, RoomKickDto, GameMoveDto, RoomRejoinDto, RoomReconnectDto } from './dtos/gameDto';
+import { RoomCreateDto, RoomJoinDto, RoomKickDto, GameMoveDto, RoomRejoinDto, GameReconnectDto } from './dtos/gameDto';
 import { GameState } from './types';
 
 const httpServer = createServer();
@@ -64,7 +65,7 @@ io.on('connection', socket => {
 			socket.data.roomId = roomId;
 			socket.join(roomId);
 
-			io.to(roomId).emit('room:refresh:preGame', gameState);
+			io.to(roomId).emit('room:refresh', gameState);
 			socket.emit('room:join:ack', gameState);
 		}, socket)
 	);
@@ -76,8 +77,9 @@ io.on('connection', socket => {
 			const gameState = await leaveRoom(playerId, roomId);
 
 			socket.leave(roomId);
+			socket.data = null;
 
-			if (gameState) io.to(roomId).emit('room:refresh:preGame', gameState);
+			if (gameState) io.to(roomId).emit('room:refresh', gameState);
 		}, socket)
 	);
 
@@ -93,42 +95,12 @@ io.on('connection', socket => {
 			targetSockets.forEach(targetSocket => {
 				if (targetSocket.data.playerId === targetPlayerId && targetSocket.data.roomId === roomId) {
 					targetSocket.leave(roomId);
+					socket.data = null;
 					targetSocket.emit('room:kicked');
 				}
 			});
 
-			if (gameState) io.to(roomId).emit('room:refresh:preGame', gameState);
-		}, socket)
-	);
-
-	socket.on(
-		'game:start',
-		safeSocketHandler(async () => {
-			const { playerId, roomId } = socket.data;
-			const gameState = await startGame(playerId, roomId);
-
-			io.to(roomId).emit('game:started', gameState);
-		}, socket)
-	);
-
-	socket.on(
-		'game:move',
-		safeSocketHandler(async (payload: GameMoveDto) => {
-			const { selectedGridLine, shouldSwitchPlayer, isLastMove } = payload;
-			const { roomId } = socket.data;
-
-			let gameState: GameState | undefined;
-			if (shouldSwitchPlayer) {
-				gameState = await switchPlayer(roomId);
-			}
-			io.to(roomId).emit('game:newMove', { selectedGridLine, gameState });
-
-			if (isLastMove) {
-				resetRoom(roomId);
-
-				const targetSockets = await io.to(roomId).fetchSockets();
-				targetSockets.forEach(targetSocket => targetSocket.leave(roomId));
-			}
+			if (gameState) io.to(roomId).emit('room:refresh', gameState);
 		}, socket)
 	);
 
@@ -143,24 +115,69 @@ io.on('connection', socket => {
 			socket.data.playerId = playerId;
 			socket.data.playerName = playerName;
 			socket.data.roomId = roomId;
-			io.to(roomId).emit('room:refresh:preGame', gameState);
+			io.to(roomId).emit('room:refresh', gameState);
 			socket.emit('room:rejoin:ack', gameState);
 		}, socket)
 	);
 
 	socket.on(
-		'room:reconnect',
-		safeSocketHandler(async (payload: RoomReconnectDto) => {
+		'room:game:start',
+		safeSocketHandler(async () => {
+			const { playerId, roomId } = socket.data;
+			const gameState = await startGame(playerId, roomId);
+
+			io.to(roomId).emit('room:game:started', gameState);
+		}, socket)
+	);
+
+	socket.on(
+		'room:game:move',
+		safeSocketHandler(async (payload: GameMoveDto) => {
+			const { selectedGridLine, shouldSwitchPlayer, isLastMove } = payload;
+			const { roomId } = socket.data;
+
+			let gameState: GameState | undefined;
+			if (shouldSwitchPlayer) {
+				gameState = await switchPlayer(roomId);
+			}
+			io.to(roomId).emit('room:game:updateBoard', { selectedGridLine, gameState });
+
+			if (isLastMove) {
+				resetRoom(roomId);
+
+				const targetSockets = await io.to(roomId).fetchSockets();
+				targetSockets.forEach(targetSocket => targetSocket.leave(roomId));
+			}
+		}, socket)
+	);
+
+	socket.on(
+		'room:game:leave',
+		safeSocketHandler(async () => {
+			const { playerId, roomId } = socket.data;
+			const gameState = await leaveGame(playerId, roomId);
+
+			socket.leave(roomId);
+			socket.data = null;
+
+			if (gameState) io.to(roomId).emit('room:game:refresh', gameState);
+		}, socket)
+	);
+
+	socket.on(
+		'room:game:reconnect',
+		safeSocketHandler(async (payload: GameReconnectDto) => {
 			const { playerId, playerName, roomId } = payload;
-			const gameState = await reconnectRoom(playerId, playerName, roomId);
+			const gameState = await reconnectGame(playerId, roomId);
 
 			socket.join(roomId);
 
 			socket.data.playerId = playerId;
 			socket.data.playerName = playerName;
 			socket.data.roomId = roomId;
-			io.to(roomId).emit('room:refresh:preGame', gameState);
-			socket.emit('room:reconnect:ack', gameState);
+
+			io.to(roomId).emit('room:game:refresh', gameState);
+			socket.emit('room:game:reconnect:ack', gameState);
 		}, socket)
 	);
 

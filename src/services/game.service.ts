@@ -139,6 +139,16 @@ export const resetRoom = async (roomId: string) => {
 	await redis.set(`room:${roomId}:gameState`, JSON.stringify(gameState));
 };
 
+export const leaveGame = async (playerId: string, roomId: string) => {
+	const gameState = await getGameState(roomId);
+	const player = await getPlayer(gameState, playerId);
+
+	gameState.players = gameState.players.map(pl => (pl.playerId === playerId ? { ...pl, isConnected: false } : pl));
+
+	await redis.set(`room:${roomId}:gameState`, JSON.stringify(gameState));
+	return gameState;
+};
+
 export const rejoinRoom = async (playerId: string, playerName: string, roomId: string) => {
 	const gameState = await getGameState(roomId);
 	if (gameState.gameStarted) throw new GameError(gameErrorMessages.GAME_STARTED);
@@ -156,7 +166,7 @@ export const rejoinRoom = async (playerId: string, playerName: string, roomId: s
 	return gameState;
 };
 
-export const reconnectRoom = async (playerId: string, playerName: string, roomId: string) => {
+export const reconnectGame = async (playerId: string, roomId: string) => {
 	const gameState = await getGameState(roomId);
 	if (!gameState.gameStarted) throw new GameError(gameErrorMessages.DISCONNECTED);
 	const player = getPlayer(gameState, playerId);

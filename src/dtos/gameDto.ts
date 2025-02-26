@@ -11,9 +11,10 @@ export type RoomJoinDto = {
 };
 
 export type RoomRejoinDto = RoomJoinDto;
-export type RoomReconnectDto = RoomJoinDto;
 
 export type RoomKickDto = { targetPlayerId: string };
+
+export type GameReconnectDto = RoomJoinDto;
 
 export type GameMoveDto = {
 	selectedGridLine: { [key: string]: number };
