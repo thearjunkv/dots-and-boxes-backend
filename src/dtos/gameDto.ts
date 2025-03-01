@@ -17,7 +17,8 @@ export type RoomKickDto = { targetPlayerId: string };
 export type GameReconnectDto = RoomJoinDto;
 
 export type GameMoveDto = {
-	selectedGridLine: { [key: string]: number };
-	shouldSwitchPlayer: boolean;
+	selectedLine: { id: string; by: string };
+	capturedBoxes: { id: string; by: string }[];
+	nextMove: string;
 	isLastMove: boolean;
 };

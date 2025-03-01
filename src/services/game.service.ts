@@ -2,7 +2,7 @@ import { gameErrorMessages } from '../constants/game';
 import { gameConfig } from '../constants/gameConfig';
 import { GameError } from '../errors/GameError';
 import redis from '../redis';
-import { GameState } from '../types';
+import { GameState, SavedGameProgress } from '../types';
 import { generateId } from '../utils';
 
 export const getGameState = async (roomId: string) => {
@@ -10,6 +10,13 @@ export const getGameState = async (roomId: string) => {
 	if (!gameStateJson) throw new GameError(gameErrorMessages.ROOM_NOT_FOUND);
 
 	return JSON.parse(gameStateJson || '{}') as GameState;
+};
+
+export const getSavedGameProgress = async (roomId: string) => {
+	const savedGameProgressJson = await redis.get(`room:${roomId}:savedGameProgress`);
+	if (!savedGameProgressJson) throw new GameError(gameErrorMessages.ROOM_NOT_FOUND);
+
+	return JSON.parse(savedGameProgressJson || '{}') as SavedGameProgress;
 };
 
 const getPlayer = async (gameState: GameState, playerId: string) => {
@@ -26,8 +33,8 @@ export const createRoom = async (playerId: string, playerName: string, gridSize:
 
 	const gameState: GameState = {
 		roomId,
-		currentMove: '',
 		gameStarted: false,
+		nextMove: '',
 		gridSize,
 		host: playerId,
 		players: [
@@ -39,7 +46,13 @@ export const createRoom = async (playerId: string, playerName: string, gridSize:
 		]
 	};
 
+	const savedGame: SavedGameProgress = {
+		selectedLines: [],
+		capturedBoxes: []
+	};
+
 	await redis.set(`room:${roomId}:gameState`, JSON.stringify(gameState));
+	await redis.set(`room:${roomId}:savedGameProgress`, JSON.stringify(savedGame));
 	return { roomId, gameState };
 };
 
@@ -62,6 +75,7 @@ export const leaveRoom = async (playerId: string, roomId: string) => {
 	const gameState = await getGameState(roomId);
 	if (gameState.players.length <= 1) {
 		await redis.del(`room:${roomId}:gameState`);
+		await redis.del(`room:${roomId}:savedGameProgress`);
 		return;
 	}
 	const player = await getPlayer(gameState, playerId);
@@ -98,33 +112,31 @@ export const startGame = async (playerId: string, roomId: string) => {
 	if (gameState.players.length < 2) throw new GameError(gameErrorMessages.PLAYER_COUNT_LOW);
 
 	gameState.gameStarted = true;
-	gameState.currentMove = gameState.players[0].playerId;
+	gameState.nextMove = gameState.players[0].playerId;
 
 	await redis.set(`room:${roomId}:gameState`, JSON.stringify(gameState));
 	return gameState;
 };
 
-export const switchPlayer = async (roomId: string) => {
+export const saveGameProgress = async (
+	roomId: string,
+	nextMove: string,
+	selectedLine: { id: string; by: string },
+	capturedBoxes: { id: string; by: string }[]
+) => {
 	const gameState = await getGameState(roomId);
-	if (gameState.gameStarted) throw new GameError(gameErrorMessages.GAME_STARTED);
+	gameState.nextMove = nextMove;
 
-	let currentPlayerIndex = gameState.players.findIndex(pl => pl.playerId === gameState.currentMove);
-	const totalPlayers = gameState.players.length;
-	if (currentPlayerIndex === -1) throw new GameError(gameErrorMessages.PLAYER_NOT_FOUND);
+	const savedGameProgress = await getSavedGameProgress(roomId);
 
-	let switched: boolean = false;
-	while (!switched) {
-		currentPlayerIndex += 1;
-		if (currentPlayerIndex >= totalPlayers) {
-			currentPlayerIndex = 1;
-		}
-		const player = gameState.players[currentPlayerIndex];
-		if (player.isConnected) {
-			gameState.currentMove = player.playerId;
-		}
-	}
+	savedGameProgress.selectedLines.push([selectedLine.id, selectedLine.by]);
+	capturedBoxes.forEach(box => {
+		savedGameProgress.capturedBoxes.push([box.id, box.by]);
+	});
 
+	await redis.set(`room:${roomId}:savedGameProgress`, JSON.stringify(savedGameProgress));
 	await redis.set(`room:${roomId}:gameState`, JSON.stringify(gameState));
+
 	return gameState;
 };
 
@@ -133,8 +145,8 @@ export const resetRoom = async (roomId: string) => {
 	if (gameState.gameStarted) throw new GameError(gameErrorMessages.GAME_STARTED);
 
 	gameState.gameStarted = false;
-	gameState.currentMove = '';
 	gameState.host = '';
+	gameState.nextMove = '';
 	gameState.players = [];
 	await redis.set(`room:${roomId}:gameState`, JSON.stringify(gameState));
 };
@@ -168,13 +180,14 @@ export const rejoinRoom = async (playerId: string, playerName: string, roomId: s
 
 export const reconnectGame = async (playerId: string, roomId: string) => {
 	const gameState = await getGameState(roomId);
+	const savedGameProgress = await getSavedGameProgress(roomId);
 	if (!gameState.gameStarted) throw new GameError(gameErrorMessages.DISCONNECTED);
 	const player = getPlayer(gameState, playerId);
 
 	gameState.players = gameState.players.map(pl => (pl.playerId === playerId ? { ...pl, isConnected: true } : pl));
 
 	await redis.set(`room:${roomId}:gameState`, JSON.stringify(gameState));
-	return gameState;
+	return { gameState, savedGameProgress };
 };
 
 export const playerDisconnect = async (playerId: string, roomId: string) => {
@@ -185,6 +198,7 @@ export const playerDisconnect = async (playerId: string, roomId: string) => {
 
 		if (gameState.players.length === 0) {
 			await redis.del(`room:${roomId}:gameState`);
+			await redis.del(`room:${roomId}:savedGameProgress`);
 			return;
 		}
 
@@ -199,6 +213,7 @@ export const playerDisconnect = async (playerId: string, roomId: string) => {
 
 		if (gameState.players.filter(pl => pl.isConnected).length === 0) {
 			await redis.del(`room:${roomId}:gameState`);
+			await redis.del(`room:${roomId}:savedGameProgress`);
 			return;
 		}
 		await redis.set(`room:${roomId}:gameState`, JSON.stringify(gameState));

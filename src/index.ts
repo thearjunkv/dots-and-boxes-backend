@@ -7,16 +7,15 @@ import {
 	kickPlayerFromRoom,
 	rejoinRoom,
 	startGame,
-	switchPlayer,
 	resetRoom,
 	leaveGame,
 	reconnectGame,
-	playerDisconnect
+	playerDisconnect,
+	saveGameProgress
 } from './services/game.service';
 import { gameErrorMessages } from './constants/game';
 import { GameError } from './errors/GameError';
 import { RoomCreateDto, RoomJoinDto, RoomKickDto, GameMoveDto, RoomRejoinDto, GameReconnectDto } from './dtos/gameDto';
-import { GameState } from './types';
 
 const httpServer = createServer();
 const io = new Server(httpServer, {
@@ -77,7 +76,7 @@ io.on('connection', socket => {
 			const gameState = await leaveRoom(playerId, roomId);
 
 			socket.leave(roomId);
-			socket.data = null;
+			socket.data = {};
 
 			if (gameState) io.to(roomId).emit('room:update:state', gameState);
 		}, socket)
@@ -95,7 +94,7 @@ io.on('connection', socket => {
 			targetSockets.forEach(targetSocket => {
 				if (targetSocket.data.playerId === targetPlayerId && targetSocket.data.roomId === roomId) {
 					targetSocket.leave(roomId);
-					socket.data = null;
+					socket.data = {};
 					targetSocket.emit('room:kicked');
 				}
 			});
@@ -133,14 +132,11 @@ io.on('connection', socket => {
 	socket.on(
 		'room:game:move',
 		safeSocketHandler(async (payload: GameMoveDto) => {
-			const { selectedGridLine, shouldSwitchPlayer, isLastMove } = payload;
+			const { selectedLine, capturedBoxes, nextMove, isLastMove } = payload;
 			const { roomId } = socket.data;
+			const gameState = await saveGameProgress(roomId, nextMove, selectedLine, capturedBoxes);
 
-			let gameState: GameState | undefined;
-			if (shouldSwitchPlayer) {
-				gameState = await switchPlayer(roomId);
-			}
-			io.to(roomId).emit('room:game:updateBoard', { selectedGridLine, gameState });
+			io.to(roomId).emit('room:game:updateBoard', { selectedLine, capturedBoxes, gameState });
 
 			if (isLastMove) {
 				resetRoom(roomId);
@@ -158,7 +154,7 @@ io.on('connection', socket => {
 			const gameState = await leaveGame(playerId, roomId);
 
 			socket.leave(roomId);
-			socket.data = null;
+			socket.data = {};
 
 			if (gameState) io.to(roomId).emit('room:update:state', gameState);
 		}, socket)
@@ -168,7 +164,7 @@ io.on('connection', socket => {
 		'room:game:reconnect',
 		safeSocketHandler(async (payload: GameReconnectDto) => {
 			const { playerId, playerName, roomId } = payload;
-			const gameState = await reconnectGame(playerId, roomId);
+			const { gameState, savedGameProgress } = await reconnectGame(playerId, roomId);
 
 			socket.join(roomId);
 
@@ -177,7 +173,7 @@ io.on('connection', socket => {
 			socket.data.roomId = roomId;
 
 			io.to(roomId).emit('room:update:state', gameState);
-			socket.emit('room:game:reconnect:ack', gameState);
+			socket.emit('room:game:reconnect:ack', { gameState, savedGameProgress });
 		}, socket)
 	);
 

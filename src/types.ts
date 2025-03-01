@@ -1,7 +1,7 @@
 export type GameState = {
 	roomId: string;
 	gameStarted: boolean;
-	currentMove: string;
+	nextMove: string;
 	gridSize: string;
 	host: string;
 	players: {
@@ -9,4 +9,9 @@ export type GameState = {
 		playerName: string;
 		isConnected: boolean;
 	}[];
+};
+
+export type SavedGameProgress = {
+	selectedLines: [string, string][];
+	capturedBoxes: [string, string][];
 };
