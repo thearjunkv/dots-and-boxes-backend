@@ -10,7 +10,7 @@ export type RoomJoinDto = {
 	roomId: string;
 };
 
-export type RoomRejoinDto = RoomJoinDto;
+export type RoomRejoinDto = RoomJoinDto & { gridSize: string };
 
 export type RoomKickDto = { targetPlayerId: string };
 

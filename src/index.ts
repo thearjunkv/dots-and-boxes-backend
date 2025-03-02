@@ -7,11 +7,11 @@ import {
 	kickPlayerFromRoom,
 	rejoinRoom,
 	startGame,
-	resetRoom,
 	leaveGame,
 	reconnectGame,
 	playerDisconnect,
-	saveGameProgress
+	saveGameProgress,
+	clearGameDataFromStore
 } from './services/game.service';
 import { gameErrorMessages } from './constants/game';
 import { GameError } from './errors/GameError';
@@ -109,8 +109,8 @@ io.on('connection', socket => {
 	socket.on(
 		'room:rejoin',
 		safeSocketHandler(async (payload: RoomRejoinDto) => {
-			const { playerId, playerName, roomId } = payload;
-			const gameState = await rejoinRoom(playerId, playerName, roomId);
+			const { playerId, playerName, roomId, gridSize } = payload;
+			const gameState = await rejoinRoom(playerId, playerName, roomId, gridSize);
 
 			socket.join(roomId);
 
@@ -142,10 +142,15 @@ io.on('connection', socket => {
 			io.to(roomId).emit('room:game:updateBoard', { selectedLine, capturedBoxes, nextMove });
 
 			if (isLastMove) {
-				resetRoom(roomId);
+				clearGameDataFromStore(roomId);
 
 				const targetSockets = await io.to(roomId).fetchSockets();
-				targetSockets.forEach(targetSocket => targetSocket.leave(roomId));
+				targetSockets.forEach(targetSocket => {
+					targetSocket.leave(roomId);
+					targetSocket.data.playerId = null;
+					targetSocket.data.playerName = null;
+					targetSocket.data.roomId = null;
+				});
 			}
 		}, socket)
 	);
