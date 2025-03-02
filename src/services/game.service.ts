@@ -57,7 +57,7 @@ export const createRoom = async (playerId: string, playerName: string, gridSize:
 };
 
 export const joinRoom = async (playerId: string, playerName: string, roomId: string) => {
-	const gameState = await getGameState(roomId.toUpperCase());
+	const gameState = await getGameState(roomId);
 	if (gameState.gameStarted) throw new GameError(gameErrorMessages.GAME_STARTED);
 	if (gameState.players.length === gameConfig.playerCount) throw new GameError(gameErrorMessages.ROOM_FULL);
 
@@ -128,16 +128,13 @@ export const saveGameProgress = async (
 	gameState.nextMove = nextMove;
 
 	const savedGameProgress = await getSavedGameProgress(roomId);
-
 	savedGameProgress.selectedLines.push([selectedLine.id, selectedLine.by]);
 	capturedBoxes.forEach(box => {
 		savedGameProgress.capturedBoxes.push([box.id, box.by]);
 	});
 
-	await redis.set(`room:${roomId}:savedGameProgress`, JSON.stringify(savedGameProgress));
 	await redis.set(`room:${roomId}:gameState`, JSON.stringify(gameState));
-
-	return gameState;
+	await redis.set(`room:${roomId}:savedGameProgress`, JSON.stringify(savedGameProgress));
 };
 
 export const resetRoom = async (roomId: string) => {

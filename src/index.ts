@@ -56,7 +56,8 @@ io.on('connection', socket => {
 	socket.on(
 		'room:join',
 		safeSocketHandler(async (payload: RoomJoinDto) => {
-			const { playerId, playerName, roomId } = payload;
+			const { playerId, playerName } = payload;
+			const roomId = payload.roomId.toUpperCase();
 			const gameState = await joinRoom(playerId, playerName, roomId);
 
 			socket.data.playerId = playerId;
@@ -94,7 +95,9 @@ io.on('connection', socket => {
 			targetSockets.forEach(targetSocket => {
 				if (targetSocket.data.playerId === targetPlayerId && targetSocket.data.roomId === roomId) {
 					targetSocket.leave(roomId);
-					socket.data = {};
+					targetSocket.data.playerId = null;
+					targetSocket.data.playerName = null;
+					targetSocket.data.roomId = null;
 					targetSocket.emit('room:kicked');
 				}
 			});
@@ -134,9 +137,9 @@ io.on('connection', socket => {
 		safeSocketHandler(async (payload: GameMoveDto) => {
 			const { selectedLine, capturedBoxes, nextMove, isLastMove } = payload;
 			const { roomId } = socket.data;
-			const gameState = await saveGameProgress(roomId, nextMove, selectedLine, capturedBoxes);
+			await saveGameProgress(roomId, nextMove, selectedLine, capturedBoxes);
 
-			io.to(roomId).emit('room:game:updateBoard', { selectedLine, capturedBoxes, gameState });
+			io.to(roomId).emit('room:game:updateBoard', { selectedLine, capturedBoxes, nextMove });
 
 			if (isLastMove) {
 				resetRoom(roomId);
