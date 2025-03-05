@@ -19,7 +19,7 @@ import { RoomCreateDto, RoomJoinDto, RoomKickDto, GameMoveDto, RoomRejoinDto, Ga
 
 const httpServer = createServer();
 const io = new Server(httpServer, {
-	cors: { origin: '*' }
+	cors: { origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }
 });
 
 const safeSocketHandler = (
@@ -195,6 +195,8 @@ io.on('connection', socket => {
 	);
 });
 
-httpServer.listen(3000, () => {
-	console.log('Socket.io server running on port 3000');
+const PORT = process.env.PORT || 3000;
+
+httpServer.listen(PORT, () => {
+	console.log(`Socket.io server running on port ${PORT}`);
 });
