@@ -12,10 +12,17 @@ import {
 	playerDisconnect,
 	saveGameProgress,
 	clearGameDataFromStore
-} from './services/game.service';
-import { gameErrorMessages } from './constants/game';
-import { GameError } from './errors/GameError';
-import { RoomCreateDto, RoomJoinDto, RoomKickDto, GameMoveDto, RoomRejoinDto, GameReconnectDto } from './dtos/gameDto';
+} from './services/game.service.js';
+import { gameErrorMessages } from './constants/game.js';
+import { GameError } from './errors/GameError.js';
+import {
+	RoomCreateDto,
+	RoomJoinDto,
+	RoomKickDto,
+	GameMoveDto,
+	RoomRejoinDto,
+	GameReconnectDto
+} from './dtos/gameDto.js';
 
 const httpServer = createServer();
 const io = new Server(httpServer, {

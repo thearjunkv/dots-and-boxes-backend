@@ -1,9 +1,9 @@
-import { gameErrorMessages } from '../constants/game';
-import { gameConfig } from '../constants/gameConfig';
-import { GameError } from '../errors/GameError';
-import redis from '../redis';
-import { GameState, SavedGameProgress } from '../types';
-import { generateId } from '../utils';
+import { gameErrorMessages } from '../constants/game.js';
+import { gameConfig } from '../constants/gameConfig.js';
+import { GameError } from '../errors/GameError.js';
+import redis from '../redis.js';
+import { GameState, SavedGameProgress } from '../types.js';
+import { generateId } from '../utils.js';
 
 export const getGameState = async (roomId: string) => {
 	const gameStateJson = await redis.get(`room:${roomId}:gameState`);
