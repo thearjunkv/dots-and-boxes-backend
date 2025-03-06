@@ -1,5 +1,8 @@
 import { DefaultEventsMap, Server, Socket } from 'socket.io';
 import { createServer } from 'http';
+import express from 'express';
+import cors from 'cors';
+import redis from './redis.js';
 import {
 	createRoom,
 	joinRoom,
@@ -24,9 +27,11 @@ import {
 	GameReconnectDto
 } from './dtos/gameDto.js';
 
-const httpServer = createServer();
+const app = express();
+const httpServer = createServer(app);
+const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 const io = new Server(httpServer, {
-	cors: { origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }
+	cors: { origin: CORS_ORIGIN }
 });
 
 const safeSocketHandler = (
@@ -43,6 +48,17 @@ const safeSocketHandler = (
 		}
 	};
 };
+
+app.use(cors({ origin: CORS_ORIGIN }));
+
+app.get('/keep-alive', async (req, res) => {
+	try {
+		await redis.ping();
+		res.status(200).json({ message: 'Ping successful' });
+	} catch (e) {
+		res.status(500).json({ error: 'Redis connection failed' });
+	}
+});
 
 io.on('connection', socket => {
 	socket.on(
